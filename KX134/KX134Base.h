@@ -22,8 +22,8 @@
 #ifndef KX134BASE_H
 #define KX134BASE_H
 
-#define KX134_DEBUG 0
-
+#define KX134_DEBUG 0  
+// debug class printing - if set to 1 console prints the logs
 #include "mbed.h"
 
 /**
@@ -168,7 +168,7 @@ Power ≈ < 1 mW
         ZOUT_L = 0x0C,
         ZOUT_H = 0x0D,
         COTR = 0x12,
-        WHO_AM_I = 0x13,
+        WHO_AM_I = 0x13,  // default value is 0x46
         TSCP = 0x14,
         TSPP = 0x15,
         INS1 = 0x16,
@@ -179,7 +179,9 @@ Power ≈ < 1 mW
         CNTL1 = 0x1B,
         CNTL2 = 0x1C,
         CNTL3 = 0x1D,
-        CNTL4 = 0x1E,
+        CNTL4 = 0x1E,  //0x1E << 1 = 0x3C (write)
+                       //  0x3C | 0x01 = 0x3D (read) -> pico directly converts the read adnd write bit directly
+
         CNTL5 = 0x1F,
         CNTL6 = 0x20,
         ODCNTL = 0x21,
