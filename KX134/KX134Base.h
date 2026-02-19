@@ -12,6 +12,13 @@
  * https://d10bqar0tuhard.cloudfront.net/en/datasheet/KX134-1211-Specifications-Rev-1.0.pdf
  */
 
+ /*
+  #ifdef __cplusplus
+   extern "C" { - tells the compiler that everything inside the block treat as c
+   if this code is run usign c compiler - completely ignore
+   #endif 
+   this is to treat the code as C based only
+ */
 #ifndef KX134BASE_H
 #define KX134BASE_H
 
@@ -123,7 +130,26 @@ public:
 
 protected:
     /**
-     * @brief The list of registers
+     * @brief The list of registers - lets sue tilt in putputs as well
+     -- tilt and accel -> run parallely,can get data as well up, down kinda..
+     interupts -> if using multi engine methods
+     back to sleep -> first device runs in low power mode-> when the values are greater than threshold-> then wakesup to full poer mode
+     Back-to-Sleep:
+
+Automatic switching from high-performance back to low-power when motion stops.
+
+At 100 Hz:
+
+Voltage: typically 3.3V
+
+Current:
+
+Low Power: ~50–100 µA
+
+High Performance: ~200–300 µA
+
+Power ≈ < 1 mW
+
      */
     enum class Register : uint8_t
     {
@@ -231,6 +257,7 @@ protected:
      * @param[in] low The 8 lower bits
      * @param[in] high The 8 upper bits
      * @return The signed representation of their value
+     i2c, spi send data in 8 bit chunks
      */
     int16_t convertTo16BitValue(uint8_t low, uint8_t high);
 
@@ -243,7 +270,7 @@ protected:
     void enableRegisterWriting();
 
     /**
-     * @brief Saves current settings and disables modification to ODCNTL and CNTL1 registers
+     * @brief Saves current settings and disables modification to ODCNTL - >(controls output datarate and filtering) and CNTL1 -> (controls power, range, engines) registers
      */
     void disableRegisterWriting();
 
@@ -272,6 +299,9 @@ protected:
      * @param[in] addr The register to read from
      * @param[out] rx_buf The buffer to read into
      * @param[in] size The number of bytes to read
+      this is cirtual function means a child will be calling it
+      the zero  depicts that the base class cannot implement it,  it is abstract
+      for i2c -> send slave and register address, then repeated start
      */
     virtual void readRegister(Register addr, char* rx_buf, int size = 1) = 0;
 
@@ -286,7 +316,7 @@ protected:
     virtual void writeRegister(Register addr, char* data, char* rx_buf = nullptr, int size = 1) = 0;
 
 protected:
-    /** @brief Calibration offsets in LSB */
+    /** @brief Calibration offsets in LSB */ // x,y,z
     int16_t _offsets[3];
 
     /**
@@ -373,7 +403,9 @@ protected:
 
     /**
      * @brief Low-Pass filter Roll-Off control
-     *
+     roll off- how aggresively the filter removes high frequency signals
+     it controls the corner frequncy of the lpf
+     * ex - 100/2 = 50 hz  from where the data gets reduced (low pass filter)
      * LPRO = 0 – IIR filter corner frequency set to ODR/9 (default)
      * LPRO = 1 – IIR filter corner frequency set to ODR/2
      */
@@ -430,3 +462,18 @@ protected:
 };
 
 #endif // KX134_H
+
+/*
+ free fall detection Even though gravity exists, both the spacecraft and sensor are falling together → no reaction force → accelerometer reads ≈ 0 g.
+  it helps to understand when to turn on parachute command  and when the space craft is in ballistic phase 
+  input - 1.7 - 3.6v, current ->
+  |      ODR | Typical Current |
+| -------: | --------------: |
+|    50 Hz |         ~170 µA |
+|   100 Hz |     ~180–200 µA |
+|   400 Hz |         ~230 µA |
+|    1 kHz |         ~300 µA |
+|  6.4 kHz |         ~600 µA |
+| 25.6 kHz |         ~1.5 mA |
+
+*/
