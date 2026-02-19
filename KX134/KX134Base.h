@@ -34,6 +34,7 @@ class KX134Base
 public:
     /**
      * @brief The possible acceleration ranges
+     they are fine with c99 and arm pico standard but for portability -> should use hex instead
      */
     enum class Range : uint8_t
     {
