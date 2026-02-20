@@ -5,21 +5,29 @@
 
 /** Set to 1 to enable debug printouts */
 #define KX134_DEBUG 0
+/*
+__VA_ARGS__ is the c pre processor token that processes whatever the extra arguments that are sent to the variadic argument... if nothing is called .. it will be removed by the macro
+*/
+/*
+   if (kx134_disable() != KX134_OK)
+        return KX134_ERR_COMM;
+    here , we are disabling pc1 -> whihc is bit 7 of cntrl -> pc1 is like power control -> it says whetehr the acc is in standby mode -> 0 or actively measuring ->1
+*/
 
-KX134Base::KX134Base()
-    : res(1)
+KX134Base::KX134Base() // we dont want the shadow state from there the drivers select the values
+    : res(1) // high performance
     , drdye_enable(1)
-    , gsel { 0, 0 }
-    , tdte_enable(0)
-    , tpe_enable(0)
-    , iir_bypass(0)
-    , lpro(0)
-    , fstup(1)
-    , osa { 0, 1, 1, 0 }
+    , gsel { 0, 0 } // 8g
+    , tdte_enable(0) // tap engine off
+    , tpe_enable(0)  // tilt engine off
+    , iir_bypass(0) // no bypassing -> filter is on
+    , lpro(0) // roll off control -> strong filtering
+    , fstup(1) // fast startup enabled
+    , osa { 0, 1, 1, 0 } // 50Hz ODR
 {
 }
 
-bool KX134Base::reset()
+bool KX134Base::reset() // upon reset, wait for 2 sec and  then call chceckexistence
 {
     // write registers to start reset
     writeRegisterOneByte(Register::INTERNAL_0X7F, 0x00);
@@ -99,7 +107,7 @@ bool KX134Base::dataReady()
     printf("Checking if data is ready: expected 0x10, received 0x%X\r\n", buf);
 #endif
 
-    return (buf & (1 << 4)); // bit4 should be set
+    return (buf & (1 << 4)); // bit4 should be set if it is -> new acc value is present
 }
 
 float KX134Base::convertRawToGravs(int16_t lsbValue) const
@@ -132,7 +140,8 @@ float KX134Base::convertRawToGravs(int16_t lsbValue) const
 
 void KX134Base::setAccelOffsets(int16_t* offsets) { memcpy(_offsets, offsets, sizeof(_offsets)); }
 
-void KX134Base::setAccelRange(Range range)
+void KX134Base::setAccelRange(Range range)  // PC1 | RES | DRDYE | GSEL1 | GSEL0 | TDTE | TPE
+
 {
 #if KX134_DEBUG
     printf("Setting range to 0x%" PRIx8 "\r\n", static_cast<uint8_t>(range));

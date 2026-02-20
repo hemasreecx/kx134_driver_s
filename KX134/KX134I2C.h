@@ -33,6 +33,7 @@ protected:
      * @param[in] addr The register to read from
      * @param[out] rx_buf The buffer to read into
      * @param[in] size The number of bytes to read
+     start, slaveaddr+w, register address, restart, slave address + r, read bytes , stop
      */
     virtual void readRegister(Register addr, char* rx_buf, int size = 1) override;
 

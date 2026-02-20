@@ -92,14 +92,14 @@ public:
      * @param[in] lsbValue The value in LSB to convert to gravs
      * @return The value in gravs
      */
-    float convertRawToGravs(int16_t lsbValue) const;
+    float convertRawToGravs(int16_t lsbValue) const; // didnt add this in kx134.h
 
     /**
      * @brief Set offsets that will be added to each acceleration reading before it is returned.
      *
      * @param[in] offsets array of 3 integers that will be added to the results
      */
-    void setAccelOffsets(int16_t* offsets);
+    void setAccelOffsets(int16_t* offsets);   //// didnt add this in kx134.h
 
     /**
      * @brief Set acceleration range (8, 16, 32, or 64 gs)
@@ -127,7 +127,7 @@ public:
      *
      * @return true if the init is successful, false otherwise
      */
-    virtual bool init() = 0;
+    virtual bool init() = 0;  //--
 
 protected:
     /**
