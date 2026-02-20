@@ -1,0 +1,28 @@
+imu acqusition layer  - > it says that when and how to get the imu data 
+bus is like interface -> it knows how to get the data
+task it does-> The IMU acquisition layer controls the sampling behavior and data flow between the driver and the rest of the system
+1. initilaises the imu
+2. decides when to read -> rules are -> 1. polling, 2. poll when data ready is true, interrupt fire, timer based freq
+3. read data safely
+4. push into buffer
+5. mainain deterministic sampling
+---------
+coming to the fifo buffer internally present in kx134-1211 -> it can store 512 samples ->
+1 sample  = 6 bytes(x,y,z)
+so 512 samples  = 3KB
+
+------------
+
+in imu conversion -> lets first print the og data and then after validation , will use efficent methodd while tx to gnd
+calibration -> 
+
+reduce fifo size
+classes add
+fdir -> no infinite loops
+plan a test case file -> that does check whether 
+
+while using cpp
+lets avoid -> dynamic memnory allocation, no stl, no virtual functions, no heap
+
+
+i2c low and high pin pullling sda chweck in the bus file

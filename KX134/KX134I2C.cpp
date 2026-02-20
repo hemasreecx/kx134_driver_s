@@ -1,7 +1,7 @@
 #include "KX134I2C.h"
-#include "inttypes.h"
+#include "inttypes.h" // used for formatted printing macros
 
-#define KX_I2C_FREQ 100000
+#define KX_I2C_FREQ 100000  // 100khz 
 
 KX134I2C::KX134I2C(PinName sda, PinName scl, uint8_t i2c_addr_)
     : KX134Base()
