@@ -26,3 +26,113 @@ lets avoid -> dynamic memnory allocation, no stl, no virtual functions, no heap
 
 
 i2c low and high pin pullling sda chweck in the bus file
+
+---Higher ODR → more noise
+
+----Lower ODR → smoother
+
+kx134 (Driver)
+
+Raw register communication only.
+
+🔹 imu_acquisition
+
+Call driver
+
+Get raw
+
+Call conversion
+
+Return processed struct
+
+🔹 imu_conversion
+
+Convert raw → g
+
+🔹 data_logger
+
+Format
+
+Timestamp
+
+Print / store
+
+🔹 main
+
+Initialize I2C
+
+Create objects
+
+Configure sensor
+
+Loop at 50Hz
+
+Call acquisition
+
+Call logger
+
+-------------------
+imu_conversion is the physics layer.
+
+It must:
+
+1️⃣ Take raw sensor counts (int16_t)
+2️⃣ Know what range is configured (8g / 16g / 32g / 64g)
+3️⃣ Apply correct scale factor
+4️⃣ Apply calibration offsets (optional but recommended)
+5️⃣ Output usable physical units
+
+----------------------
+imu values dry run--
+example  -  64g
+raw.x, raw.y, raw.z = (16384, -8192, 3276)
+as it is int16 -> range (-32768 to 32767)
+scale =  full_scale / 32768 -> 64/ 32768 => 0.001953125g
+
+now lets multiply by raw scale ->  x_g = 16384* 0.001953125 =>  32g
+similarly y_g =  -8192*  0.001953125 => -16g
+z_g =  3276 *  0.001953125 => 6.39g
+
+Raw int16
+   ↓
+Subtract offset
+   ↓
+Multiply by scale
+   ↓
+Get physical g
+
+after that instead of loat-> send
+32.0g * 100 -> 3200 
+
+-----> while working on classes -> explicit declaration will prevent type conversion
+
+converting the 16 bit offset and the imu values to 32 bit while subtraction to  prevent wrap around/ overflow
+
+--------------------------
+main.cpp
+Initialize stdio
+
+Initialize I2C
+
+Configure GPIO pins
+
+Create KX134 object
+
+Configure sensor
+
+Create IMUConversion (64g)
+
+Loop at 50 Hz
+
+Read raw
+
+Convert
+
+Print structured telemetry
+
+i2c_write_blocking() = once the bus gets locked-> stays locked forever
+
+
+in main file-> if 1 is present then raw values, if 0  then converted values
+
+
