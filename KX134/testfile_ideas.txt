@@ -1,0 +1,7 @@
+How to Confirm Your Address
+
+You can run an I2C scanner on RP2040:
+
+It will show either:
+
+Found device at 0x1E
