@@ -1,7 +1,9 @@
-How to Confirm Your Address
+1. How to Confirm Your Address
 
 You can run an I2C scanner on RP2040:
 
 It will show either:
 
 Found device at 0x1E
+
+2.  check if we are using fifo buffer of kx134-1211 chip or NOT

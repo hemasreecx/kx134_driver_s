@@ -135,4 +135,7 @@ i2c_write_blocking() = once the bus gets locked-> stays locked forever
 
 in main file-> if 1 is present then raw values, if 0  then converted values
 
+----------------------------------------------------------------------------------
 
+KX134_DEBUG = 1 (or true): Debug mode is ON - KX134_LOG() will print to console
+KX134_DEBUG = 0 (or false): Debug mode is OFF - KX134_LOG() expands to nothing (silent)
