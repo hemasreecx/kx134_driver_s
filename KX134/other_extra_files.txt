@@ -134,8 +134,60 @@ i2c_write_blocking() = once the bus gets locked-> stays locked forever
 
 
 in main file-> if 1 is present then raw values, if 0  then converted values
-
+--> nodiscard (no- discard) is c++17 feature
+so nodiscard is a attribute that warns if return value is not used of a particular function
+ so it is available in cpp17
 ----------------------------------------------------------------------------------
 
 KX134_DEBUG = 1 (or true): Debug mode is ON - KX134_LOG() will print to console
 KX134_DEBUG = 0 (or false): Debug mode is OFF - KX134_LOG() expands to nothing (silent)
+
+
+------------------------
+i2c_blockinng errors ->  they block the execution until the transaction completes or an error is returned..
+1. it can hang the firmware in  
+    a. if the slave holds SCL low indefinetely due to bug / glitch -> master just waits forever with no timeout
+    b. if the slave does not respond this API can spin indefinetely
+
+
+-- explicit helps by not converting the accidental implicit conversions
+
+DataLogger::DataLogger(LoggerMode mode)   // scope resolution operator  The underscore prefix _ is a naming convention for private members.
+    : _mode(mode) // : _mode(mode) — this is a member initializer list. The : starts it. It directly initializes the private member _mode with the value of mode before the constructor body runs. Preferred over assigning inside {} because it's more efficient.
+
+{
+}  // {} — empty body, nothing else to do.
+
+// constexpr — the value is known at compile time and can't change. Stronger than const — the compiler can use it in optimizations and it takes no memory at runtime.
+
+in i2cbus.cpp
+int written = i2c_write_timeout_us(_instance,
+                                       device_addr,
+                                       buffer,
+                                       2,
+                                       false,
+                                       _timeout);
+Pico SDK function. Parameters:
+
+_instance — which I2C hardware block (i2c0 or i2c1)
+device_addr — the 7-bit I2C address of the target sensor
+buffer — pointer to the data to send
+2 — number of bytes to send
+false — nostop flag. false means send a STOP condition after the write, ending the transaction normally. true would hold the bus for a follow-up read (not needed here)
+_timeout — microseconds before giving up
+
+--- this autorelease the bus feature should be in kx134.cpp driver.. not even in the main
+ // Configure I2C auto-release behavior
+    bool ok = _bus.write(KX134_ADDR, 0x20, 0b00000111); // CNTL6
+    if (!ok) return false;
+    
+-- noexcept tells the compiler and anyone reading the code "this function is guaranteed to never throw."
+-- If you marked something noexcept but it did throw internally, the program would call std::terminate() and crash immediately rather than propagating the exception. So it's a promise you need to keep.
+
+In your KX134::init() you configure:
+
+CNTL1 ✅
+
+ODCNTL ✅
+
+PC1 enable ✅

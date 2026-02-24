@@ -20,10 +20,10 @@
 #define KX134_ADDRESS           0x1F
 
 #define SAMPLE_RATE_HZ          50
-#define MAIN_LOOP_INTERVAL_MS   (1000 / SAMPLE_RATE_HZ)
+#define MAIN_LOOP_INTERVAL_MS   (1000 / SAMPLE_RATE_HZ)  // which means  that 20ms between each sample
 
-#define MAX_COMM_ERRORS         10
-#define MAX_RECOVERY_ATTEMPTS   3
+#define MAX_COMM_ERRORS         10  // if consecutive 10 errors happen -> then IMU reset
+#define MAX_RECOVERY_ATTEMPTS   3 
 
 
 #if SYSTEM_DEBUG
@@ -43,7 +43,7 @@ KX134 imu(I2C_INSTANCE, KX134_ADDRESS);
 IMUConversion conversion(KX134_Range::RANGE_64G);
 
 static volatile bool system_initialized = false;
-static volatile uint32_t loop_count = 0;
+static volatile uint32_t loop_count = 0; // tracks how many samples have been taken
 
 
 
@@ -51,7 +51,11 @@ static void i2c_bus_recovery()
 {
     DEBUG_PRINT("I2C bus recovery\n");
 
-    gpio_set_function(I2C_SDA_PIN, GPIO_FUNC_SIO);
+    gpio_set_function(I2C_SDA_PIN, GPIO_FUNC_SIO); // software input output
+    /*
+    generally the scl, sda pins are under the rp2040 hardware control.. it automatically pulls up and down accordingly.. now they are like another GPIO control.. 
+    it is in our hands to  set sda, scl -> low / high respectively
+    */
     gpio_set_function(I2C_SCL_PIN, GPIO_FUNC_SIO);
 
     gpio_set_dir(I2C_SDA_PIN, GPIO_OUT);
@@ -64,6 +68,11 @@ static void i2c_bus_recovery()
         gpio_put(I2C_SCL_PIN, 1);
         sleep_us(5);
     }
+    /*
+    core logic -> we first set the pins as outputs and then toggling for 9 times.. 9 is because -> if the bus got hang in between ->
+    the pins are low and waiting for the next command.. so as 8 bits are for i2c..
+     definetely after 9 rtimes  SDA might have sent
+    */
 
     gpio_put(I2C_SDA_PIN, 1);
     gpio_put(I2C_SCL_PIN, 1);
@@ -80,6 +89,7 @@ static bool imu_recover()
 
     imu.reset();
     sleep_ms(50);
+    // after getting multiple errors -> gave 10 here .. IMU gets a  soft reset 
 
     if (imu.checkID() != KX134_Status::OK)
     {

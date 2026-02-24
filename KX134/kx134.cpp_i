@@ -1,0 +1,306 @@
+#include "kx134.hpp"
+#include "pico/stdlib.h"
+
+#if KX134_DEBUG
+#include <stdio.h>
+#define KX134_LOG(...) printf(__VA_ARGS__)
+#else
+#define KX134_LOG(...)
+#endif
+
+
+constexpr int KX134_MAX_RETRIES = 3;
+
+KX134::KX134(i2c_inst_t* i2c, uint8_t address)
+    : _i2c(i2c),
+      _address(address)
+{
+}
+
+
+
+int16_t KX134::combine(uint8_t low, uint8_t high)
+{
+    return static_cast<int16_t>((high << 8) | low);
+}
+
+
+
+bool KX134::writeRegister(KX134_Register reg, uint8_t value)
+{
+    uint8_t buffer[2];
+    buffer[0] = static_cast<uint8_t>(reg);
+    buffer[1] = value;
+
+    for (int attempt = 0; attempt < KX134_MAX_RETRIES; attempt++)
+    {
+        int ret = i2c_write_blocking(_i2c, _address, buffer, 2, false);
+
+        if (ret == 2)
+            return true;
+
+        sleep_us(100);  // small recovery delay
+    }
+
+    return false;
+}
+
+bool KX134::readRegister(KX134_Register reg, uint8_t& value)
+{
+    uint8_t reg_addr = static_cast<uint8_t>(reg);
+
+    for (int attempt = 0; attempt < KX134_MAX_RETRIES; attempt++)
+    {
+        int ret = i2c_write_blocking(_i2c, _address, &reg_addr, 1, true);
+        if (ret != 1)
+            continue;
+
+        ret = i2c_read_blocking(_i2c, _address, &value, 1, false);
+        if (ret == 1)
+            return true;
+
+        sleep_us(100);
+    }
+    return false;
+
+    
+}
+
+bool KX134::readMulti(KX134_Register reg, uint8_t* buffer, uint16_t length)
+{
+    uint8_t reg_addr = static_cast<uint8_t>(reg);
+
+    for (int attempt = 0; attempt < KX134_MAX_RETRIES; attempt++)
+    {
+        int ret = i2c_write_blocking(_i2c, _address, &reg_addr, 1, true);
+        if (ret != 1)
+            continue;
+
+        ret = i2c_read_blocking(_i2c, _address, buffer, length, false);
+        if (ret == length)
+            return true;
+
+        sleep_us(100);
+    }
+
+    return false;
+}
+
+
+
+KX134_Status KX134::checkID()
+{
+    uint8_t id;
+
+    if (!readRegister(KX134_Register::WHO_AM_I, id))
+        return KX134_Status::ERR_COMM;
+
+    if (id != KX134_WHO_AM_I_VALUE)
+        return KX134_Status::ERR_INVALID_ID;
+
+    return KX134_Status::OK;
+}
+
+KX134_Status KX134::reset()
+{
+    if (!writeRegister(KX134_Register::CNTL2, 0x80))
+        return KX134_Status::ERR_COMM;
+
+    sleep_ms(2);
+
+    return checkID();
+}
+
+
+KX134_Status KX134::disable()
+{
+    uint8_t reg;
+
+    if (!readRegister(KX134_Register::CNTL1, reg))
+        return KX134_Status::ERR_COMM;
+
+    reg &= ~(0x80);   // Clear PC1
+
+    if (!writeRegister(KX134_Register::CNTL1, reg))
+        return KX134_Status::ERR_COMM;
+
+    return KX134_Status::OK;
+}
+
+KX134_Status KX134::enable()
+{
+    uint8_t reg;
+
+    if (!readRegister(KX134_Register::CNTL1, reg))
+        return KX134_Status::ERR_COMM;
+
+    reg |= 0x80;   // Set PC1
+
+    if (!writeRegister(KX134_Register::CNTL1, reg))
+        return KX134_Status::ERR_COMM;
+
+    return KX134_Status::OK;
+}
+
+
+
+KX134_Status KX134::setRange(KX134_Range range)
+{
+    if (disable() != KX134_Status::OK)
+        return KX134_Status::ERR_COMM;
+
+    uint8_t reg;
+
+    if (!readRegister(KX134_Register::CNTL1, reg))
+        return KX134_Status::ERR_COMM;
+
+    reg &= ~(0x03 << 3);
+    reg |= (static_cast<uint8_t>(range) << 3);
+
+    if (!writeRegister(KX134_Register::CNTL1, reg))
+        return KX134_Status::ERR_COMM;
+
+    return enable();
+}
+
+KX134_Status KX134::getRange(KX134_Range& range)
+{
+    uint8_t reg;
+
+    if (!readRegister(KX134_Register::CNTL1, reg))
+        return KX134_Status::ERR_COMM;
+
+    range = static_cast<KX134_Range>((reg >> 3) & 0x03);
+
+    return KX134_Status::OK;
+}
+
+
+
+KX134_Status KX134::readRaw(KX134_Raw& raw)
+{
+    uint8_t buffer[6];
+
+    if (!readMulti(KX134_Register::XOUT_L, buffer, 6))
+        return KX134_Status::ERR_COMM;
+
+    raw.x = combine(buffer[0], buffer[1]);
+    raw.y = combine(buffer[2], buffer[3]);
+    raw.z = combine(buffer[4], buffer[5]);
+
+    return KX134_Status::OK;
+}
+
+bool KX134::dataReady()
+{
+    uint8_t status;
+
+    if (!readRegister(KX134_Register::INS2, status))
+        return false;
+
+    return (status & 0x10) != 0;
+}
+
+
+
+uint16_t KX134::readFIFO(KX134_Raw* buffer, uint16_t max_samples)
+{
+    uint8_t fifoCount;
+
+    if (!readRegister(KX134_Register::BUF_STATUS_1, fifoCount))
+        return 0;
+
+    uint16_t samples = (fifoCount > max_samples) ? max_samples : fifoCount;
+
+    for (uint16_t i = 0; i < samples; i++)
+    {
+        uint8_t data[6];
+
+        if (!readMulti(KX134_Register::BUF_READ, data, 6))
+            return i;
+
+        buffer[i].x = combine(data[0], data[1]);
+        buffer[i].y = combine(data[2], data[3]);
+        buffer[i].z = combine(data[4], data[5]);
+    }
+
+    return samples;
+}
+
+bool KX134::fifoOverflow()
+{
+    uint8_t status;
+
+    if (!readRegister(KX134_Register::BUF_STATUS_2, status))
+        return false;
+
+    return (status & 0x80) != 0;
+}
+
+
+
+
+KX134_Status KX134::selfTest()
+{
+    KX134_LOG("Starting self-test\n");
+    if (!writeRegister(KX134_Register::SELF_TEST, 0xCA))
+        return KX134_Status::ERR_COMM;
+
+    sleep_ms(2);
+
+    uint8_t cotr;
+
+    if (!readRegister(KX134_Register::COTR, cotr))
+        return KX134_Status::ERR_COMM;
+
+    writeRegister(KX134_Register::SELF_TEST, 0x00);
+
+    if (cotr != 0x55)
+    {
+        KX134_LOG("Self-test FAILED\n");
+        return KX134_Status::ERR_CONFIG;
+
+    }
+       
+    KX134_LOG("Self-test PASSED\n");
+    return KX134_Status::OK;
+}
+
+
+
+KX134_Status KX134::init(const KX134_Config& config)
+{
+    if (reset() != KX134_Status::OK)
+        return KX134_Status::ERR_COMM;
+
+    if (disable() != KX134_Status::OK)
+        return KX134_Status::ERR_COMM;
+
+    uint8_t cntl1 = 0;
+
+    // Bit 6: Performance mode
+    cntl1 |= ((static_cast<uint8_t>(config.performance_mode) & 0x01) << 6);
+
+    // Bit 5: Data Ready Interrupt
+    if (config.enable_data_ready_interrupt)
+        cntl1 |= (1 << 5);
+
+    // Bits 4:3: Range (GSEL)
+    cntl1 |= ((static_cast<uint8_t>(config.range) & 0x03) << 3);
+
+    if (!writeRegister(KX134_Register::CNTL1, cntl1))
+        return KX134_Status::ERR_CONFIG;
+
+    uint8_t odcntl = 0;
+
+    // Bit 5: FSTUP = 1
+    odcntl |= (1 << 5);
+
+    // Bits 3:0: ODR
+    odcntl |= (static_cast<uint8_t>(config.odr) & 0x0F);
+
+    if (!writeRegister(KX134_Register::ODCNTL, odcntl))
+        return KX134_Status::ERR_CONFIG;
+
+    return enable();
+}
