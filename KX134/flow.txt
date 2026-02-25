@@ -1,0 +1,54 @@
+main()
+  └── system_init()
+        ├── stdio_init_all()          // start USB/UART
+        ├── sleep_ms(500)             // let serial settle
+        ├── i2c_init()                // start I2C bus at 400kHz
+        ├── gpio setup                // SDA/SCL pins + pull-ups
+        ├── imu.checkID()             // is the chip actually there?
+        ├── imu.selfTest()            // hardware self check (warning only, not fatal)
+        ├── acquisition.init()        // configure KX134: 64G, 50Hz, high perf
+        ├── acquisition.setRateHz()   // set 50Hz sample rate
+        ├── range verification        // hw range == converter range? FATAL if not
+        ├── watchdog_enable()         // 500ms watchdog starts ticking
+        └── printf("timestamp...")    // print CSV header
+
+        while(true)
+  └── main_loop()
+        ├── watchdog_update()         // kick watchdog — proves loop is alive
+        ├── timing check              // has 20ms elapsed? if not, return
+        ├── imu.dataReady()           // is new data available? if not, return
+        └── acquisition.task()        // read → convert → log
+
+no comm_errors
+
+        acquisition.task() == OK
+  ├── comm_errors = 0       // reset error counter
+  ├── recovery_attempts = 0
+  └── loop_count++          // increment sample counter
+
+  if comm_errors
+  acquisition.task() == ERROR
+  ├── comm_errors++
+  │
+  ├── if comm_errors < 10 → just log the error, keep going
+  │
+  └── if comm_errors >= 10 → recovery sequence:
+        │
+        ├── Step 1: i2c_bus_recovery()
+        │     ├── bit-bang 9 SCL pulses   // unstick frozen slave
+        │     └── restore pins to I2C hardware
+        │
+        ├── Step 2: imu_recover()
+        │     ├── imu.reset()
+        │     ├── sleep_ms(50)            // wait for chip boot
+        │     ├── imu.checkID()           // is it back?
+        │     └── acquisition.init()      // reconfigure
+        │
+        ├── if recovery OK → recovery_attempts = 0, comm_errors = 0
+        │
+        └── if recovery FAILED:
+              ├── recovery_attempts++
+              └── if recovery_attempts >= 3:
+                    ├── printf FATAL
+                    ├── stop kicking watchdog
+                    └── while(true) → watchdog hard resets the chip
